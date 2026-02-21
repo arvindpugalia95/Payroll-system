@@ -1,1 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APSS Payroll Management System</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #333; }
 
+  .header {
+    background: linear-gradient(135deg, #1a237e, #283593);
+    color: white; padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .header h1 { font-size: 22px; font-weight: 600; }
+  .header span { font-size: 13px; opacity: 0.8; }
+
+  .nav { background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; padding: 0 32px; }
+  .nav button {
+    padding: 14px 20px; border: none; background: none; font-size: 14px; cursor: pointer;
+    color: #555; border-bottom: 3px solid transparent; transition: all 0.2s;
+  }
+  .nav button.active, .nav button:hover { color: #1a237e; border-bottom-color: #1a237e; background: #f5f7ff; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .section { display: none; }
+
+  .card {
+    background: white; border-radius: 10px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 24px; margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 16px; color: #1a237e; margin-bottom: 18px;
+    padding-bottom: 10px; border-bottom: 2px solid #e8eaf6;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: white; transition: border 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: #1a237e; box-shadow: 0 0 0 3px #e8eaf6; }
+  .form-group input[readonly] { background: #f8f9fa; color: #555; }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+
+  .month-picker { display: flex; gap: 6px; }
+  .month-picker select { flex: 1; padding: 9px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+
+  .btn { padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-primary { background: #1a237e; color: white; } .btn-primary:hover { background: #283593; }
+  .btn-success { background: #2e7d32; color: white; } .btn-success:hover { background: #388e3c; }
+  .btn-warning { background: #f57c00; color: white; } .btn-warning:hover { background: #ef6c00; }
+  .btn-danger  { background: #c62828; color: white; } .btn-danger:hover  { background: #d32f2f; }
+  .btn-info    { background: #0277bd; color: white; } .btn-info:hover    { background: #0288d1; }
+  .btn-secondary { background: #546e7a; color: white; } .btn-secondary:hover { background: #455a64; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+
+  /* Payslip */
+  .payslip-preview {
+    background: white; border: 1px solid #bbb; padding: 30px;
+    max-width: 780px; margin: 0 auto; font-family: Arial, sans-serif; font-size: 12px;
+  }
+  .ps-title { text-align: center; font-size: 20px; font-weight: bold; color: #1a237e; margin-bottom: 2px; }
+  .ps-sub   { text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 3px; margin-bottom: 16px; }
+  .ps-grid  { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #333; margin-bottom: 14px; }
+  .ps-cell  { padding: 5px 8px; border-bottom: 1px solid #ccc; }
+  .ps-cell:nth-child(odd) { border-right: 1px solid #ccc; }
+  .ps-cell.full { grid-column: span 2; border-right: none; }
+  .ps-lbl   { font-weight: bold; display: inline-block; min-width: 155px; }
+  .ps-tbl   { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .ps-tbl th { background: #1a237e; color: white; padding: 7px 10px; text-align: left; }
+  .ps-tbl td { padding: 5px 10px; border-bottom: 1px solid #eee; }
+  .ps-tbl tfoot td { font-weight: bold; background: #f0f0f0; border-top: 2px solid #333; }
+  .ps-net td { background: #e8f5e9 !important; text-align: center; font-size: 15px; font-weight: bold; color: #2e7d32; padding: 10px !important; }
+
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th { background: #e8eaf6; padding: 10px; text-align: left; font-weight: 600; color: #1a237e; }
+  table.data-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  table.data-table tr:hover td { background: #f5f7ff; }
+
+  .alert { padding: 12px 16px; border-radius: 6px; font-size: 14px; margin-top: 10px; }
+  .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
+  .alert-error   { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
+  .alert-info    { background: #e3f2fd; color: #0277bd; border-left: 4px solid #2196f3; }
+
+  .loading { display: none; text-align: center; padding: 20px; color: #666; }
+  .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #1a237e; border-radius: 50%; width: 28px; height: 28px; animation: spin 0.8s linear infinite; margin: 0 auto 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider { font-size: 12px; font-weight: 700; color: #1a237e; margin: 18px 0 10px;
+    padding-bottom: 5px; border-bottom: 2px solid #e8eaf6; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 28px; width: 92%; max-width: 680px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { font-size: 16px; color: #1a237e; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid #e8eaf6; }
+
+  @media print {
+    body > *:not(#printArea) { display: none !important; }
+    #printArea { display: block !important; }
+    .no-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🏢 APSS Payroll Management System</h1>
+    <span id="sheetStatus">⚠️ Connect to Google Sheets to get started</span>
+  </div>
+  <div style="font-size:13px;opacity:0.8">APSS and Co</div>
+</div>
+
+<div class="nav">
+  <button id="nav-generate"    onclick="showSection('generate')">📄 Generate Payslip</button>
+  <button id="nav-monthly"     onclick="showSection('monthly')">📝 Monthly Data</button>
+  <button id="nav-employees"   onclick="showSection('employees')">👥 Employees</button>
+  <button id="nav-workingdays" onclick="showSection('workingdays')">📅 Working Days</button>
+  <button id="nav-setup"       onclick="showSection('setup')">⚙️ Setup</button>
+</div>
+
+<div class="container">
+
+<!-- ======= SETUP ======= -->
+<div id="section-setup" class="section">
+  <div class="card">
+    <h2>⚙️ Google Sheets Setup</h2>
+    <p style="font-size:13px;color:#666;margin-bottom:14px">Connect this page to your Google Sheet via Apps Script.</p>
+    <div class="form-group" style="max-width:640px">
+      <label>Apps Script Web App URL</label>
+      <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/…/exec" />
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="saveConfig()">💾 Save &amp; Connect</button></div>
+    <div id="setupAlert" class="alert alert-info" style="margin-top:14px">
+      📌 <strong>First-time:</strong><br>
+      1. Open Google Sheet → Extensions → Apps Script<br>
+      2. Paste <code>Code.gs</code> content, run <strong>setupSheets()</strong> once<br>
+      3. Deploy → New Deployment → Web App → Execute as: <em>Me</em> → Access: <em>Anyone</em><br>
+      4. Paste the Web App URL above and Save
+    </div>
+  </div>
+</div>
+
+<!-- ======= GENERATE PAYSLIP ======= -->
+<div id="section-generate" class="section">
+  <div class="card">
+    <h2>📄 Generate Payslip</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:16px;max-width:680px;align-items:flex-end">
+      <div class="form-group">
+        <label>Month *</label>
+        <select id="gen_month" onchange="onGenMonthChange()">
+          <option value="">-- Select Month --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Employee *</label>
+        <select id="gen_employee" onchange="loadEmployeeDetails()" disabled>
+          <option value="">-- Select Employee --</option>
+        </select>
+      </div>
+      <button class="btn btn-info" onclick="refreshGenMonths()">🔄 Refresh</button>
+    </div>
+
+    <div id="gen_loading" class="loading"><div class="spinner"></div>Loading…</div>
+    <div id="gen_alert"></div>
+
+    <div id="gen_details" style="display:none">
+      <div class="divider">Employee Information</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Designation</label><input type="text" id="gen_designation" readonly /></div>
+        <div class="form-group"><label>Date of Joining</label><input type="text" id="gen_doj" readonly /></div>
+        <div class="form-group"><label>PAN</label><input type="text" id="gen_pan" readonly /></div>
+        <div class="form-group"><label>Aadhaar</label><input type="text" id="gen_aadhaar" readonly /></div>
+        <div class="form-group"><label>Email</label><input type="text" id="gen_email" readonly /></div>
+        <div class="form-group"><label>Mobile</label><input type="text" id="gen_mobile" readonly /></div>
+        <div class="form-group" style="grid-column:span 2"><label>Address</label><textarea id="gen_address" readonly></textarea></div>
+        <div class="form-group"><label>Bank Name</label><input type="text" id="gen_bank" readonly /></div>
+        <div class="form-group"><label>Account No.</label><input type="text" id="gen_account" readonly /></div>
+        <div class="form-group"><label>IFSC</label><input type="text" id="gen_ifsc" readonly /></div>
+      </div>
+
+      <div class="divider">Attendance &amp; Hours</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Working Days</label><input type="number" id="gen_workingdays" readonly /></div>
+        <div class="form-group"><label>Night Hours Worked</label><input type="number" id="gen_nighthours" readonly /></div>
+        <div class="form-group"><label>Available Hours (Days×9)</label><input type="number" id="gen_availhours" readonly /></div>
+        <div class="form-group"><label>Hours (excl. Break)</label><input type="number" id="gen_actualhours" readonly /></div>
+        <div class="form-group"><label>Leave Encashment Hours</label><input type="number" id="gen_leavehours" readonly /></div>
+        <div class="form-group"><label>Monthly Remuneration (Gross)</label><input type="number" id="gen_remuneration" readonly /></div>
+        <div class="form-group"><label>Retention Bonus (Master)</label><input type="number" id="gen_retentionmaster" readonly /></div>
+      </div>
+
+      <div class="divider">Monthly Adjustments (Editable)</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Performance Bonus (Earnings)</label><input type="number" id="gen_perfbonus" value="0" /></div>
+        <div class="form-group"><label>Leave Encashment Amount</label><input type="number" id="gen_leaveamt" value="0" /></div>
+        <div class="form-group"><label>Salary Advance</label><input type="number" id="gen_saladvance" value="0" /></div>
+        <div class="form-group"><label>Additional Retention (Deduction)</label><input type="number" id="gen_addretention" value="0" /></div>
+        <div class="form-group"><label>Advance Already Paid (Deduction)</label><input type="number" id="gen_advancepaid" value="0" /></div>
+        <div class="form-group"><label>Perf. Bonus Paid Cash (Deduction)</label><input type="number" id="gen_perfcash" value="0" /></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="computeAndPreview()">🔢 Compute &amp; Preview</button>
+        <button class="btn btn-success" onclick="savePayslip()">💾 Save to Sheet</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="payslipPreviewCard" class="card" style="display:none">
+    <h2>Payslip Preview <button class="btn btn-warning btn-sm no-print" onclick="printPayslip()">🖨️ Print</button></h2>
+    <div class="payslip-preview" id="payslipHTML"></div>
+  </div>
+</div>
+
+<!-- ======= MONTHLY DATA ======= -->
+<div id="section-monthly" class="section">
+  <div class="card">
+    <h2>📝 Monthly Data Entry</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:16px;max-width:680px;align-items:flex-end;margin-bottom:4px">
+      <div class="form-group">
+        <label>Month *</label>
+        <div class="month-picker">
+          <select id="md_month_m">
+            <option value="">MMM</option>
+            <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+            <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+            <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+          </select>
+          <select id="md_month_y" style="flex:0 0 72px">
+            <option value="">YY</option>
+            <option>24</option><option>25</option><option>26</option><option>27</option><option>28</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Employee *</label>
+        <select id="md_employee"><option value="">-- Select --</option></select>
+      </div>
+      <button class="btn btn-info" onclick="loadMonthlyData()">📂 Load Existing</button>
+    </div>
+    <div id="md_alert"></div>
+
+    <div class="divider">Attendance</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Night Hours Worked</label><input type="number" id="md_nighthours" value="0" step="0.01" /></div>
+      <div class="form-group"><label>Hours (excl. Break)</label><input type="number" id="md_actualhours" value="0" step="0.01" /></div>
+      <div class="form-group"><label>Leave Encashment Hours</label><input type="number" id="md_leavehours" value="0" step="0.01" /></div>
+    </div>
+    <div class="divider">Earnings Adjustments</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Performance Bonus</label><input type="number" id="md_perfbonus" value="0" /></div>
+      <div class="form-group"><label>Leave Encashment Amt</label><input type="number" id="md_leaveamt" value="0" /></div>
+      <div class="form-group"><label>Salary Advance</label><input type="number" id="md_saladvance" value="0" /></div>
+    </div>
+    <div class="divider">Deduction Adjustments</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Additional Retention</label><input type="number" id="md_addretention" value="0" /></div>
+      <div class="form-group"><label>Advance Already Paid</label><input type="number" id="md_advancepaid" value="0" /></div>
+      <div class="form-group"><label>Perf. Bonus Paid (Cash)</label><input type="number" id="md_perfcash" value="0" /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="saveMonthlyData()">💾 Save</button>
+      <button class="btn btn-danger"  onclick="clearMonthlyForm()">🗑️ Clear</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Monthly Data List</h2>
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap">
+      <div class="form-group">
+        <label>Filter Month</label>
+        <div class="month-picker" style="width:200px">
+          <select id="fmd_m">
+            <option value="">All</option>
+            <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+            <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+            <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+          </select>
+          <select id="fmd_y" style="flex:0 0 72px">
+            <option value="">All</option>
+            <option>24</option><option>25</option><option>26</option><option>27</option><option>28</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="loadMonthlyTable()">🔍 Load</button>
+    </div>
+    <div id="monthlyTable" style="overflow-x:auto">Click Load to view.</div>
+  </div>
+</div>
+
+<!-- ======= EMPLOYEES ======= -->
+<div id="section-employees" class="section">
+  <div class="card">
+    <h2>👥 Add / Update Employee</h2>
+    <p style="font-size:13px;color:#666;margin-bottom:14px">Multiple remuneration rows per employee are supported — system picks latest applicable for the selected month.</p>
+    <div class="form-grid">
+      <div class="form-group"><label>Employee Name *</label><input type="text" id="emp_name" /></div>
+      <div class="form-group"><label>Designation</label><input type="text" id="emp_designation" /></div>
+      <div class="form-group"><label>Date of Joining</label><input type="text" id="emp_doj" placeholder="01Oct2022" /></div>
+      <div class="form-group"><label>PAN</label><input type="text" id="emp_pan" /></div>
+      <div class="form-group"><label>Aadhaar</label><input type="text" id="emp_aadhaar" /></div>
+      <div class="form-group"><label>Email</label><input type="email" id="emp_email" /></div>
+      <div class="form-group"><label>Mobile</label><input type="text" id="emp_mobile" /></div>
+      <div class="form-group" style="grid-column:span 2"><label>Address</label><textarea id="emp_address"></textarea></div>
+      <div class="form-group"><label>Bank Name</label><input type="text" id="emp_bank" /></div>
+      <div class="form-group"><label>Account No.</label><input type="text" id="emp_account" /></div>
+      <div class="form-group"><label>IFSC</label><input type="text" id="emp_ifsc" /></div>
+      <div class="form-group">
+        <label>Effective From (Month) *</label>
+        <div class="month-picker">
+          <select id="emp_eff_m">
+            <option value="">MMM</option>
+            <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+            <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+            <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+          </select>
+          <select id="emp_eff_y" style="flex:0 0 72px">
+            <option value="">YY</option>
+            <option>24</option><option>25</option><option>26</option><option>27</option><option>28</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Monthly Remuneration (Gross) *</label><input type="number" id="emp_remuneration" /></div>
+      <div class="form-group"><label>Retention Bonus</label><input type="number" id="emp_retention" value="0" /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="saveEmployee()">💾 Save Employee</button>
+      <button class="btn btn-danger"  onclick="clearEmpForm()">🗑️ Clear</button>
+    </div>
+    <div id="emp_alert"></div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Employee List <button class="btn btn-primary btn-sm" onclick="loadEmployeeTable()">🔄 Refresh</button></h2>
+    <div id="employeeTable" style="overflow-x:auto">Click Refresh to load.</div>
+  </div>
+</div>
+
+<!-- ======= WORKING DAYS ======= -->
+<div id="section-workingdays" class="section">
+  <div class="card">
+    <h2>📅 Working Days Master</h2>
+    <div class="form-grid" style="max-width:460px">
+      <div class="form-group">
+        <label>Month *</label>
+        <div class="month-picker">
+          <select id="wd_m">
+            <option value="">MMM</option>
+            <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+            <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+            <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+          </select>
+          <select id="wd_y" style="flex:0 0 72px">
+            <option value="">YY</option>
+            <option>24</option><option>25</option><option>26</option><option>27</option><option>28</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Working Days *</label><input type="number" id="wd_days" min="1" max="31" /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="saveWorkingDays()">💾 Save</button>
+      <button class="btn btn-danger"  onclick="clearWdForm()">🗑️ Clear</button>
+    </div>
+    <div id="wd_alert"></div>
+  </div>
+  <div class="card">
+    <h2>📋 Working Days List <button class="btn btn-primary btn-sm" onclick="loadWdTable()">🔄 Refresh</button></h2>
+    <div id="wdTable" style="margin-top:12px">Click Refresh.</div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- ===== PRINT AREA (hidden unless printing) ===== -->
+<div id="printArea" style="display:none"></div>
+
+<!-- ===== EMPLOYEE MODAL ===== -->
+<div id="empModal" class="modal-overlay">
+  <div class="modal">
+    <h3 id="empModalTitle">Edit Employee</h3>
+    <input type="hidden" id="modal_emp_rowindex" />
+    <div class="form-grid">
+      <div class="form-group"><label>Name *</label><input type="text" id="modal_emp_name" /></div>
+      <div class="form-group"><label>Designation</label><input type="text" id="modal_emp_designation" /></div>
+      <div class="form-group"><label>Date of Joining</label><input type="text" id="modal_emp_doj" /></div>
+      <div class="form-group"><label>PAN</label><input type="text" id="modal_emp_pan" /></div>
+      <div class="form-group"><label>Aadhaar</label><input type="text" id="modal_emp_aadhaar" /></div>
+      <div class="form-group"><label>Email</label><input type="email" id="modal_emp_email" /></div>
+      <div class="form-group"><label>Mobile</label><input type="text" id="modal_emp_mobile" /></div>
+      <div class="form-group" style="grid-column:span 2"><label>Address</label><textarea id="modal_emp_address"></textarea></div>
+      <div class="form-group"><label>Bank Name</label><input type="text" id="modal_emp_bank" /></div>
+      <div class="form-group"><label>Account No.</label><input type="text" id="modal_emp_account" /></div>
+      <div class="form-group"><label>IFSC</label><input type="text" id="modal_emp_ifsc" /></div>
+      <div class="form-group">
+        <label>Effective From</label>
+        <div class="month-picker">
+          <select id="modal_emp_eff_m">
+            <option value="">MMM</option>
+            <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+            <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+            <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+          </select>
+          <select id="modal_emp_eff_y" style="flex:0 0 72px">
+            <option value="">YY</option>
+            <option>24</option><option>25</option><option>26</option><option>27</option><option>28</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label>Remuneration (Gross)</label><input type="number" id="modal_emp_remuneration" /></div>
+      <div class="form-group"><label>Retention Bonus</label><input type="number" id="modal_emp_retention" /></div>
+    </div>
+    <div id="modal_emp_alert"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-success"   onclick="saveEmpModal()">💾 Save</button>
+      <button class="btn btn-secondary" onclick="closeModal('empModal')">✕ Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MONTHLY DATA EDIT MODAL ===== -->
+<div id="mdModal" class="modal-overlay">
+  <div class="modal">
+    <h3>✏️ Edit Monthly Data</h3>
+    <input type="hidden" id="modal_md_rowindex" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px">
+      <div class="form-group"><label>Month</label><input type="text" id="modal_md_month" readonly /></div>
+      <div class="form-group"><label>Employee</label><input type="text" id="modal_md_employee" readonly /></div>
+    </div>
+    <div class="divider">Attendance</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Night Hours</label><input type="number" id="modal_md_nighthours" step="0.01" /></div>
+      <div class="form-group"><label>Actual Hours (excl. Break)</label><input type="number" id="modal_md_actualhours" step="0.01" /></div>
+      <div class="form-group"><label>Leave Encashment Hours</label><input type="number" id="modal_md_leavehours" step="0.01" /></div>
+    </div>
+    <div class="divider">Earnings</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Perf Bonus</label><input type="number" id="modal_md_perfbonus" /></div>
+      <div class="form-group"><label>Leave Encashment Amt</label><input type="number" id="modal_md_leaveamt" /></div>
+      <div class="form-group"><label>Salary Advance</label><input type="number" id="modal_md_saladvance" /></div>
+    </div>
+    <div class="divider">Deductions</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Add. Retention</label><input type="number" id="modal_md_addretention" /></div>
+      <div class="form-group"><label>Advance Paid</label><input type="number" id="modal_md_advancepaid" /></div>
+      <div class="form-group"><label>Perf Cash</label><input type="number" id="modal_md_perfcash" /></div>
+    </div>
+    <div id="modal_md_alert"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-success"   onclick="saveMdModal()">💾 Save Changes</button>
+      <button class="btn btn-secondary" onclick="closeModal('mdModal')">✕ Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CORE
+// ============================================================
+const CONFIG_KEY = 'apss_script_url';
+let scriptUrl = '';
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Convert MmmYY to a sortable string: "Jan26" → "2601"
+function mmmyyToSort(s) {
+  if (!s || s.length < 5) return '';
+  const mi = MONTHS.indexOf(s.slice(0,3));
+  return s.slice(3) + String(mi+1).padStart(2,'0');
+}
+
+function buildMmmYY(mId, yId) {
+  const m = document.getElementById(mId).value;
+  const y = document.getElementById(yId).value;
+  return (m && y) ? m + y : '';
+}
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.style.display='none');
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-'+name).style.display = 'block';
+  document.getElementById('nav-'+name).classList.add('active');
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function showAlert(id, msg, type) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const cls = {error:'alert-error', success:'alert-success', info:'alert-info'}[type] || 'alert-info';
+  el.innerHTML = `<div class="alert ${cls}">${msg}</div>`;
+  setTimeout(()=>{ if(el) el.innerHTML=''; }, 5000);
+}
+
+function fmt(n) { return (parseFloat(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function setVal(id,v) { const e=document.getElementById(id); if(e) e.value=v??''; }
+function getTxt(id)   { return (document.getElementById(id)?.value||'').trim(); }
+function getNum(id)   { return parseFloat(document.getElementById(id)?.value)||0; }
+
+async function callScript(action, payload={}) {
+  if (!scriptUrl) { alert('Configure Script URL in Setup first.'); return null; }
+  try {
+    const res = await fetch(scriptUrl+'?'+new URLSearchParams({action,...payload}));
+    return await res.json();
+  } catch(e) { return {success:false, message:'Network error: '+e.message}; }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  scriptUrl = localStorage.getItem(CONFIG_KEY)||'';
+  if (scriptUrl) {
+    document.getElementById('scriptUrl').value = scriptUrl;
+    document.getElementById('sheetStatus').textContent = '✅ Connected to Google Sheets';
+    showSection('generate');
+    loadAllDropdowns();
+    refreshGenMonths();
+  } else {
+    showSection('setup');
+  }
+}
+
+async function saveConfig() {
+  const url = document.getElementById('scriptUrl').value.trim();
+  if (!url) { alert('Enter the URL.'); return; }
+  scriptUrl = url;
+  localStorage.setItem(CONFIG_KEY, url);
+  document.getElementById('sheetStatus').textContent = '✅ Connected';
+  document.getElementById('setupAlert').innerHTML = '✅ URL saved! Go to Generate Payslip tab.';
+  document.getElementById('setupAlert').className = 'alert alert-success';
+  loadAllDropdowns();
+  refreshGenMonths();
+}
+
+async function loadAllDropdowns() {
+  const data = await callScript('getEmployees');
+  if (!data?.employees) return;
+  const opts = data.employees.map(e=>`<option value="${e}">${e}</option>`).join('');
+  document.getElementById('md_employee').innerHTML = '<option value="">-- Select --</option>'+opts;
+}
+
+// ============================================================
+// GENERATE — Month first, then employee filtered by that month
+// ============================================================
+async function refreshGenMonths() {
+  const data = await callScript('getDistinctMonths');
+  const sel = document.getElementById('gen_month');
+  sel.innerHTML = '<option value="">-- Select Month --</option>';
+  if (data?.months) data.months.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
+  document.getElementById('gen_employee').innerHTML = '<option value="">-- Select Employee --</option>';
+  document.getElementById('gen_employee').disabled = true;
+  document.getElementById('gen_details').style.display = 'none';
+  document.getElementById('payslipPreviewCard').style.display = 'none';
+}
+
+async function onGenMonthChange() {
+  const month = getTxt('gen_month');
+  const empSel = document.getElementById('gen_employee');
+  empSel.innerHTML = '<option value="">-- Select Employee --</option>';
+  empSel.disabled = true;
+  document.getElementById('gen_details').style.display = 'none';
+  if (!month) return;
+  const data = await callScript('getEmployeesForMonth', { mmyy: month });
+  if (data?.employees) {
+    data.employees.forEach(e => empSel.innerHTML += `<option value="${e}">${e}</option>`);
+    empSel.disabled = false;
+  }
+}
+
+async function loadEmployeeDetails() {
+  const emp = getTxt('gen_employee'), month = getTxt('gen_month');
+  if (!emp||!month) { document.getElementById('gen_details').style.display='none'; return; }
+  document.getElementById('gen_loading').style.display='block';
+  document.getElementById('gen_details').style.display='none';
+  const data = await callScript('getEmployeeData', { employee:emp, mmyy:month });
+  document.getElementById('gen_loading').style.display='none';
+  if (!data?.success) { showAlert('gen_alert', data?.message||'Error', 'error'); return; }
+
+  ['designation','doj','pan','aadhaar','email','mobile','address','bank','account','ifsc'].forEach(f =>
+    setVal('gen_'+f, data[f])
+  );
+  setVal('gen_workingdays', data.workingDays);
+  setVal('gen_nighthours',  data.nightHours);
+  setVal('gen_availhours',  data.availableHours);
+  setVal('gen_actualhours', data.actualHours);
+  setVal('gen_leavehours',  data.leaveHours);
+  setVal('gen_remuneration',   data.remuneration);
+  setVal('gen_retentionmaster',data.retentionBonus);
+  setVal('gen_perfbonus',   data.perfBonus||0);
+  setVal('gen_leaveamt',    data.leaveAmt||0);
+  setVal('gen_saladvance',  data.salAdvance||0);
+  setVal('gen_addretention',data.addRetention||0);
+  setVal('gen_advancepaid', data.advancePaid||0);
+  setVal('gen_perfcash',    data.perfCash||0);
+  document.getElementById('gen_details').style.display='block';
+}
+
+// ============================================================
+// PAYSLIP COMPUTATION
+// ============================================================
+function computePayslip() {
+  const grossRem  = getNum('gen_remuneration');   // Gross = includes retention
+  const retMaster = getNum('gen_retentionmaster');
+  const avail     = getNum('gen_availhours');
+  const actual    = getNum('gen_actualhours');
+  const night     = getNum('gen_nighthours');
+
+  // Basic Salary = Min(Actual * Gross / Available, Gross)
+  const basicSalary = avail>0 ? Math.min(actual * grossRem / avail, grossRem) : grossRem;
+
+  // OT & Night Bonus — uses GROSS remuneration as base rate
+  const otBonus = avail>0
+    ? Math.max(actual-avail, 0) * (grossRem/avail) * 1.2
+      + night * (grossRem/avail) * 0.2
+    : 0;
+
+  const retentionEarnings = retMaster;
+  const perfBonus  = getNum('gen_perfbonus');
+  const leaveAmt   = getNum('gen_leaveamt');
+  const salAdvance = getNum('gen_saladvance');
+
+  // Retention Deduction = RetentionMaster * BasicSalary / GrossRem
+  const retDeduction  = grossRem>0 ? retMaster * basicSalary / grossRem : 0;
+  const addRetention  = getNum('gen_addretention');
+  const advancePaid   = getNum('gen_advancepaid');
+  const perfCash      = getNum('gen_perfcash');
+
+  const totalEarnings   = basicSalary + otBonus + retentionEarnings + perfBonus + leaveAmt + salAdvance;
+  const totalDeductions = retDeduction + addRetention + advancePaid + perfCash;
+  const netPay          = totalEarnings - totalDeductions;
+
+  return { basicSalary, otBonus, retentionEarnings, perfBonus, leaveAmt, salAdvance,
+    retDeduction, addRetention, advancePaid, perfCash, totalEarnings, totalDeductions, netPay };
+}
+
+function computeAndPreview() {
+  const emp = getTxt('gen_employee'), month = getTxt('gen_month');
+  if (!emp||!month) { showAlert('gen_alert','Select month and employee','error'); return; }
+  const c = computePayslip();
+
+  const html = `
+  <div class="ps-title">APSS and Co</div>
+  <div class="ps-sub">P A Y S L I P</div>
+  <div class="ps-grid">
+    <div class="ps-cell"><span class="ps-lbl">Company Name</span>APSS and Co</div>
+    <div class="ps-cell"><span class="ps-lbl">Month</span>${month}</div>
+    <div class="ps-cell"><span class="ps-lbl">Employee Name</span>${emp}</div>
+    <div class="ps-cell"><span class="ps-lbl">Working Days</span>${getTxt('gen_workingdays')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Designation</span>${getTxt('gen_designation')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Night Hours worked</span>${getTxt('gen_nighthours')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Date of Joining</span>${getTxt('gen_doj')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Available Hours</span>${getTxt('gen_availhours')}</div>
+    <div class="ps-cell"><span class="ps-lbl">PAN</span>${getTxt('gen_pan')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Leave Encashment Hours</span>${getTxt('gen_leavehours')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Adhaar</span>${getTxt('gen_aadhaar')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Monthly Remuneration</span>${fmt(getNum('gen_remuneration'))}</div>
+    <div class="ps-cell"><span class="ps-lbl">Email</span>${getTxt('gen_email')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Retention Bonus</span>${fmt(getNum('gen_retentionmaster'))}</div>
+    <div class="ps-cell"><span class="ps-lbl">Mobile No.</span>${getTxt('gen_mobile')}</div>
+    <div class="ps-cell"><span class="ps-lbl">Hours (excluding break)</span>${getTxt('gen_actualhours')}</div>
+    <div class="ps-cell full"><span class="ps-lbl">Address</span>${getTxt('gen_address')}</div>
+  </div>
+  <table class="ps-tbl">
+    <thead><tr><th>Earnings</th><th style="text-align:right;width:90px"></th><th>Deduction</th><th style="text-align:right;width:90px"></th></tr></thead>
+    <tbody>
+      <tr><td>Basic Salary</td>                <td style="text-align:right">${fmt(c.basicSalary)}</td>        <td>Retention Bonus</td>           <td style="text-align:right">${fmt(c.retDeduction)}</td></tr>
+      <tr><td>Overtime and Night Bonus</td>    <td style="text-align:right">${fmt(c.otBonus)}</td>            <td>Additional Retention</td>      <td style="text-align:right">${fmt(c.addRetention)}</td></tr>
+      <tr><td>Retention Bonus*</td>            <td style="text-align:right">${fmt(c.retentionEarnings)}</td>  <td>Advance Already Paid</td>      <td style="text-align:right">${fmt(c.advancePaid)}</td></tr>
+      <tr><td>Performance Bonus*</td>          <td style="text-align:right">${fmt(c.perfBonus)}</td>          <td>Performance Bonus Paid (Cash)</td><td style="text-align:right">${fmt(c.perfCash)}</td></tr>
+      <tr><td>Leave Encashment**</td>          <td style="text-align:right">${fmt(c.leaveAmt)}</td>           <td></td><td></td></tr>
+      <tr><td>Salary Advance</td>              <td style="text-align:right">${fmt(c.salAdvance)}</td>         <td></td><td></td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td>Total Earnings</td><td style="text-align:right">${fmt(c.totalEarnings)}</td><td>Total Deductions</td><td style="text-align:right">${fmt(c.totalDeductions)}</td></tr>
+      <tr class="ps-net"><td colspan="4">Net Pay &nbsp; ₹ ${fmt(c.netPay)}</td></tr>
+      <tr><td>${fmt(c.totalEarnings)}</td><td></td><td>${fmt(c.totalEarnings)}</td><td></td></tr>
+    </tfoot>
+  </table>
+  <div style="border:1px solid #ccc;padding:8px;margin-bottom:10px;font-size:11px">
+    <strong>Bank Name:</strong> ${getTxt('gen_bank')} &nbsp;|&nbsp;
+    <strong>Account No:</strong> ${getTxt('gen_account')} &nbsp;|&nbsp;
+    <strong>IFSC:</strong> ${getTxt('gen_ifsc')}
+  </div>
+  <div style="font-size:10px;color:#666;line-height:1.7">
+    * Performance Bonus / Retention Payout shall be payable as applicable to the eligible candidates only.<br>
+    ** Leave Encashment is based on the proportionated to the hours worked during the year.
+  </div>
+  <div style="text-align:center;margin-top:14px;font-size:10px;color:#999">
+    This is computer generated document, thus signature is not required
+  </div>`;
+
+  document.getElementById('payslipHTML').innerHTML = html;
+  document.getElementById('payslipPreviewCard').style.display='block';
+  document.getElementById('payslipPreviewCard').scrollIntoView({behavior:'smooth'});
+}
+
+function printPayslip() {
+  const content = document.getElementById('payslipHTML').innerHTML;
+  document.getElementById('printArea').innerHTML =
+    `<style>
+      .ps-title{text-align:center;font-size:20px;font-weight:bold;color:#1a237e;margin-bottom:2px}
+      .ps-sub{text-align:center;font-size:14px;font-weight:bold;letter-spacing:3px;margin-bottom:16px}
+      .ps-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #333;margin-bottom:14px;font-size:12px}
+      .ps-cell{padding:5px 8px;border-bottom:1px solid #ccc}
+      .ps-cell:nth-child(odd){border-right:1px solid #ccc}
+      .ps-cell.full{grid-column:span 2;border-right:none}
+      .ps-lbl{font-weight:bold;display:inline-block;min-width:155px}
+      .ps-tbl{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}
+      .ps-tbl th{background:#1a237e;color:white;padding:7px 10px;text-align:left}
+      .ps-tbl td{padding:5px 10px;border-bottom:1px solid #eee}
+      .ps-tbl tfoot td{font-weight:bold;background:#f0f0f0;border-top:2px solid #333}
+      .ps-net td{background:#e8f5e9!important;text-align:center;font-size:15px;font-weight:bold;color:#2e7d32;padding:10px!important}
+    </style>${content}`;
+  document.getElementById('printArea').style.display='block';
+  window.print();
+  setTimeout(()=>{ document.getElementById('printArea').style.display='none'; document.getElementById('printArea').innerHTML=''; },1000);
+}
+
+async function savePayslip() {
+  const emp=getTxt('gen_employee'), month=getTxt('gen_month');
+  if (!emp||!month) { showAlert('gen_alert','Select employee and month','error'); return; }
+  const c = computePayslip();
+  const data = await callScript('savePayslip', {
+    employee:emp, mmyy:month,
+    basicSalary:c.basicSalary.toFixed(2), otBonus:c.otBonus.toFixed(2),
+    retentionEarnings:c.retentionEarnings.toFixed(2), perfBonus:c.perfBonus.toFixed(2),
+    leaveAmt:c.leaveAmt.toFixed(2), salAdvance:c.salAdvance.toFixed(2),
+    retDeduction:c.retDeduction.toFixed(2), addRetention:c.addRetention.toFixed(2),
+    advancePaid:c.advancePaid.toFixed(2), perfCash:c.perfCash.toFixed(2),
+    netPay:c.netPay.toFixed(2)
+  });
+  if (data?.success) showAlert('gen_alert','✅ Payslip saved to Google Sheet!','success');
+  else showAlert('gen_alert', data?.message||'Error','error');
+}
+
+// ============================================================
+// MONTHLY DATA
+// ============================================================
+async function saveMonthlyData() {
+  const month = buildMmmYY('md_month_m','md_month_y');
+  const emp   = getTxt('md_employee');
+  if (!month||!emp) { showAlert('md_alert','Select month and employee','error'); return; }
+  const data = await callScript('saveMonthlyData', {
+    employee:emp, mmyy:month,
+    nightHours:getTxt('md_nighthours'), actualHours:getTxt('md_actualhours'),
+    leaveHours:getTxt('md_leavehours'), perfBonus:getTxt('md_perfbonus'),
+    leaveAmt:getTxt('md_leaveamt'), salAdvance:getTxt('md_saladvance'),
+    addRetention:getTxt('md_addretention'), advancePaid:getTxt('md_advancepaid'),
+    perfCash:getTxt('md_perfcash')
+  });
+  if (data?.success) showAlert('md_alert','✅ Saved!','success');
+  else showAlert('md_alert', data?.message||'Error','error');
+}
+
+async function loadMonthlyData() {
+  const month = buildMmmYY('md_month_m','md_month_y');
+  const emp   = getTxt('md_employee');
+  if (!month||!emp) { showAlert('md_alert','Select month and employee','error'); return; }
+  const data = await callScript('getMonthlyEntry', {employee:emp, mmyy:month});
+  if (!data?.success) { showAlert('md_alert', data?.message||'No data found','error'); return; }
+  ['nighthours','actualhours','leavehours','perfbonus','leaveamt','saladvance','addretention','advancepaid','perfcash']
+    .forEach((f,i) => {
+      const keys=['nightHours','actualHours','leaveHours','perfBonus','leaveAmt','salAdvance','addRetention','advancePaid','perfCash'];
+      setVal('md_'+f, data[keys[i]]);
+    });
+  showAlert('md_alert','✅ Data loaded!','success');
+}
+
+async function loadMonthlyTable() {
+  const m=document.getElementById('fmd_m').value, y=document.getElementById('fmd_y').value;
+  const mmyy = (m&&y)?m+y:'';
+  const data = await callScript('getMonthlyTable', {mmyy});
+  if (!data?.rows) { document.getElementById('monthlyTable').innerHTML='No data.'; return; }
+  let html=`<table class="data-table"><thead><tr>
+    <th>Month</th><th>Employee</th><th>Night Hrs</th><th>Actual Hrs</th><th>Leave Hrs</th>
+    <th>Perf Bonus</th><th>Leave Amt</th><th>Sal Adv</th><th>Add Ret</th><th>Adv Paid</th><th>Perf Cash</th><th>Action</th>
+  </tr></thead><tbody>`;
+  data.rows.forEach(r => {
+    const ri = r[11]; // rowIndex passed from server
+    html += `<tr>${r.slice(0,11).map(c=>`<td>${c}</td>`).join('')}
+      <td><button class="btn btn-warning btn-sm" onclick="editMdRow(${JSON.stringify(r)})">✏️ Edit</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('monthlyTable').innerHTML = html;
+}
+
+function editMdRow(r) {
+  setVal('modal_md_rowindex', r[11]);
+  setVal('modal_md_month',    r[0]);
+  setVal('modal_md_employee', r[1]);
+  setVal('modal_md_nighthours',   r[2]);
+  setVal('modal_md_actualhours',  r[3]);
+  setVal('modal_md_leavehours',   r[4]);
+  setVal('modal_md_perfbonus',    r[5]);
+  setVal('modal_md_leaveamt',     r[6]);
+  setVal('modal_md_saladvance',   r[7]);
+  setVal('modal_md_addretention', r[8]);
+  setVal('modal_md_advancepaid',  r[9]);
+  setVal('modal_md_perfcash',     r[10]);
+  openModal('mdModal');
+}
+
+async function saveMdModal() {
+  const data = await callScript('updateMonthlyData', {
+    rowIndex:getTxt('modal_md_rowindex'),
+    mmyy:getTxt('modal_md_month'), employee:getTxt('modal_md_employee'),
+    nightHours:getTxt('modal_md_nighthours'), actualHours:getTxt('modal_md_actualhours'),
+    leaveHours:getTxt('modal_md_leavehours'), perfBonus:getTxt('modal_md_perfbonus'),
+    leaveAmt:getTxt('modal_md_leaveamt'), salAdvance:getTxt('modal_md_saladvance'),
+    addRetention:getTxt('modal_md_addretention'), advancePaid:getTxt('modal_md_advancepaid'),
+    perfCash:getTxt('modal_md_perfcash')
+  });
+  if (data?.success) {
+    showAlert('modal_md_alert','✅ Updated!','success');
+    setTimeout(()=>{ closeModal('mdModal'); loadMonthlyTable(); },1200);
+  } else showAlert('modal_md_alert', data?.message||'Error','error');
+}
+
+function clearMonthlyForm() {
+  ['md_nighthours','md_actualhours','md_leavehours','md_perfbonus','md_leaveamt',
+   'md_saladvance','md_addretention','md_advancepaid','md_perfcash'].forEach(id=>setVal(id,0));
+}
+
+// ============================================================
+// EMPLOYEES
+// ============================================================
+async function saveEmployee() {
+  const name = getTxt('emp_name');
+  const eff  = buildMmmYY('emp_eff_m','emp_eff_y');
+  if (!name) { showAlert('emp_alert','Name required','error'); return; }
+  if (!eff)  { showAlert('emp_alert','Effective month required','error'); return; }
+  const data = await callScript('saveEmployee', {
+    name, designation:getTxt('emp_designation'), doj:getTxt('emp_doj'),
+    pan:getTxt('emp_pan'), aadhaar:getTxt('emp_aadhaar'), email:getTxt('emp_email'),
+    mobile:getTxt('emp_mobile'), address:getTxt('emp_address'),
+    bank:getTxt('emp_bank'), account:getTxt('emp_account'), ifsc:getTxt('emp_ifsc'),
+    effectiveMmyy:eff, remuneration:getTxt('emp_remuneration'), retention:getTxt('emp_retention')
+  });
+  if (data?.success) {
+    showAlert('emp_alert','✅ Saved!','success');
+    loadAllDropdowns(); loadEmployeeTable();
+  } else showAlert('emp_alert', data?.message||'Error','error');
+}
+
+async function loadEmployeeTable() {
+  const data = await callScript('getEmployeeTable');
+  if (!data?.rows) { document.getElementById('employeeTable').innerHTML='No data.'; return; }
+  let html=`<table class="data-table"><thead><tr>
+    <th>Name</th><th>Designation</th><th>DOJ</th><th>PAN</th><th>Mobile</th>
+    <th>Effective</th><th>Remuneration</th><th>Retention</th><th>Actions</th>
+  </tr></thead><tbody>`;
+  data.rows.forEach(r => {
+    const ri = r[12]; // rowIndex
+    html += `<tr>
+      ${r.slice(0,8).map(c=>`<td>${c}</td>`).join('')}
+      <td style="white-space:nowrap">
+        <button class="btn btn-warning btn-sm" onclick="editEmpRow(${ri})">✏️ Edit</button>
+        <button class="btn btn-info btn-sm" style="margin-left:4px" onclick="dupEmpRow(${ri})">📋 Dup</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('employeeTable').innerHTML = html;
+}
+
+async function editEmpRow(rowIndex) {
+  const data = await callScript('getEmployeeRow', {rowIndex});
+  if (!data?.success) { alert('Could not load row.'); return; }
+  fillEmpModal(data, rowIndex, false);
+}
+
+async function dupEmpRow(rowIndex) {
+  const data = await callScript('getEmployeeRow', {rowIndex});
+  if (!data?.success) { alert('Could not load row.'); return; }
+  fillEmpModal(data, null, true);
+}
+
+function fillEmpModal(d, rowIndex, isDup) {
+  setVal('modal_emp_rowindex', rowIndex??'');
+  document.getElementById('empModalTitle').textContent = isDup ? '📋 Duplicate Employee (Save as New)' : '✏️ Edit Employee';
+  ['name','designation','doj','pan','aadhaar','email','mobile','address','bank','account','ifsc','remuneration','retention']
+    .forEach(f => setVal('modal_emp_'+f, d[f]));
+  if (d.effectiveMmyy && d.effectiveMmyy.length>=5) {
+    document.getElementById('modal_emp_eff_m').value = d.effectiveMmyy.slice(0,3);
+    document.getElementById('modal_emp_eff_y').value = d.effectiveMmyy.slice(3);
+  }
+  openModal('empModal');
+}
+
+async function saveEmpModal() {
+  const rowIndex = getTxt('modal_emp_rowindex');
+  const eff      = buildMmmYY('modal_emp_eff_m','modal_emp_eff_y');
+  const payload  = {
+    name:getTxt('modal_emp_name'), designation:getTxt('modal_emp_designation'),
+    doj:getTxt('modal_emp_doj'), pan:getTxt('modal_emp_pan'), aadhaar:getTxt('modal_emp_aadhaar'),
+    email:getTxt('modal_emp_email'), mobile:getTxt('modal_emp_mobile'), address:getTxt('modal_emp_address'),
+    bank:getTxt('modal_emp_bank'), account:getTxt('modal_emp_account'), ifsc:getTxt('modal_emp_ifsc'),
+    effectiveMmyy:eff, remuneration:getTxt('modal_emp_remuneration'), retention:getTxt('modal_emp_retention')
+  };
+  const data = rowIndex
+    ? await callScript('updateEmployee', {...payload, rowIndex})
+    : await callScript('saveEmployee', payload);
+  if (data?.success) {
+    showAlert('modal_emp_alert','✅ Saved!','success');
+    setTimeout(()=>{ closeModal('empModal'); loadEmployeeTable(); loadAllDropdowns(); },1200);
+  } else showAlert('modal_emp_alert', data?.message||'Error','error');
+}
+
+function clearEmpForm() {
+  ['emp_name','emp_designation','emp_doj','emp_pan','emp_aadhaar','emp_email','emp_mobile',
+   'emp_address','emp_bank','emp_account','emp_ifsc','emp_remuneration','emp_retention'].forEach(id=>setVal(id,''));
+  document.getElementById('emp_eff_m').value='';
+  document.getElementById('emp_eff_y').value='';
+}
+
+// ============================================================
+// WORKING DAYS
+// ============================================================
+async function saveWorkingDays() {
+  const month = buildMmmYY('wd_m','wd_y');
+  const days  = getTxt('wd_days');
+  if (!month||!days) { showAlert('wd_alert','Fill all fields','error'); return; }
+  const data = await callScript('saveWorkingDays', {mmyy:month, days});
+  if (data?.success) { showAlert('wd_alert','✅ Saved!','success'); loadWdTable(); }
+  else showAlert('wd_alert', data?.message||'Error','error');
+}
+
+async function loadWdTable() {
+  const data = await callScript('getWorkingDays');
+  if (!data?.rows) { document.getElementById('wdTable').innerHTML='No data.'; return; }
+  let html=`<table class="data-table"><thead><tr><th>Month</th><th>Working Days</th></tr></thead><tbody>`;
+  data.rows.forEach(r => html += `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`);
+  html += '</tbody></table>';
+  document.getElementById('wdTable').innerHTML = html;
+}
+
+function clearWdForm() {
+  document.getElementById('wd_m').value='';
+  document.getElementById('wd_y').value='';
+  setVal('wd_days','');
+}
+
+init();
+</script>
+</body>
+</html>
