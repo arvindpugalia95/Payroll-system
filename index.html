@@ -615,10 +615,13 @@ function computePayslip() {
   const actual    = getNum('gen_actualhours');
   const night     = getNum('gen_nighthours');
 
-  // Basic Salary = Min(Actual * Gross / Available, Gross)
-  const basicSalary = avail>0 ? Math.min(actual * grossRem / avail, grossRem) : grossRem;
+  // Base for Basic Salary = Gross minus Retention
+  const baseRem = grossRem - retMaster;
 
-  // OT & Night Bonus — uses GROSS remuneration as base rate
+  // Basic Salary = Min(ActualHours × (Gross - Retention) / AvailHours, (Gross - Retention))
+  const basicSalary = avail>0 ? Math.min(actual * baseRem / avail, baseRem) : baseRem;
+
+  // OT & Night Bonus — uses full GROSS remuneration as base rate (unchanged)
   const otBonus = avail>0
     ? Math.max(actual-avail, 0) * (grossRem/avail) * 1.2
       + night * (grossRem/avail) * 0.2
@@ -629,8 +632,8 @@ function computePayslip() {
   const leaveAmt   = getNum('gen_leaveamt');
   const salAdvance = getNum('gen_saladvance');
 
-  // Retention Deduction = RetentionMaster * BasicSalary / GrossRem
-  const retDeduction  = grossRem>0 ? retMaster * basicSalary / grossRem : 0;
+  // Retention Deduction = Retention × BasicSalary / (Gross - Retention)
+  const retDeduction  = baseRem>0 ? retMaster * basicSalary / baseRem : 0;
   const addRetention  = getNum('gen_addretention');
   const advancePaid   = getNum('gen_advancepaid');
   const perfCash      = getNum('gen_perfcash');
