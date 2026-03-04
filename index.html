@@ -154,7 +154,7 @@
 <div id="section-generate" class="section">
   <div class="card">
     <h2>📄 Generate Payslip</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:16px;max-width:680px;align-items:flex-end">
+    <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:16px;max-width:820px;align-items:flex-end">
       <div class="form-group">
         <label>Month *</label>
         <select id="gen_month" onchange="onGenMonthChange()">
@@ -168,10 +168,23 @@
         </select>
       </div>
       <button class="btn btn-info" onclick="refreshGenMonths()">🔄 Refresh</button>
+      <button class="btn btn-success" onclick="loadAllForMonth()" id="btn_loadall" style="display:none">📋 Load All</button>
     </div>
 
     <div id="gen_loading" class="loading"><div class="spinner"></div>Loading…</div>
     <div id="gen_alert"></div>
+
+    <!-- ===== BATCH SUMMARY (Load All) ===== -->
+    <div id="batchSummaryCard" style="display:none;margin-top:18px">
+      <div class="divider">Monthly Payslip Summary — All Employees</div>
+      <div id="batchLoading" class="loading"><div class="spinner"></div>Loading all employees…</div>
+      <div id="batchTable" style="overflow-x:auto"></div>
+      <div class="btn-row" id="batchBtnRow" style="display:none">
+        <button class="btn btn-success" onclick="saveAllPayslips()">💾 Save All to Sheet</button>
+        <button class="btn btn-danger" onclick="closeBatchSummary()">✕ Close Summary</button>
+      </div>
+      <div id="batch_alert"></div>
+    </div>
 
     <div id="gen_details" style="display:none">
       <div class="divider">Employee Information</div>
@@ -613,11 +626,14 @@ async function onGenMonthChange() {
   empSel.innerHTML = '<option value="">-- Select Employee --</option>';
   empSel.disabled = true;
   document.getElementById('gen_details').style.display = 'none';
+  document.getElementById('batchSummaryCard').style.display = 'none';
+  document.getElementById('btn_loadall').style.display = 'none';
   if (!month) return;
   const data = await callScript('getEmployeesForMonth', { mmyy: month });
-  if (data?.employees) {
+  if (data?.employees && data.employees.length) {
     data.employees.forEach(e => empSel.innerHTML += `<option value="${e}">${e}</option>`);
     empSel.disabled = false;
+    document.getElementById('btn_loadall').style.display = 'inline-block';
   }
 }
 
@@ -800,6 +816,151 @@ async function savePayslip() {
   });
   if (data?.success) showAlert('gen_alert','✅ Payslip saved to Google Sheet!','success');
   else showAlert('gen_alert', data?.message||'Error','error');
+}
+
+// ============================================================
+// BATCH — Load All & Save All
+// ============================================================
+let batchResults = []; // stores computed results for Save All
+
+function computePayslipFromData(d) {
+  const grossRem  = d.remuneration || 0;
+  const retMaster = d.retentionBonus || 0;
+  const avail     = d.availableHours || 0;
+  const actual    = d.actualHours || 0;
+  const night     = d.nightHours || 0;
+
+  const basicSalary = avail > 0 ? Math.min(actual * grossRem / avail, grossRem) : grossRem;
+  const otBonus = avail > 0
+    ? Math.max(actual - avail, 0) * (grossRem / avail) * 1.2 + night * (grossRem / avail) * 0.2
+    : 0;
+
+  const retAccrued   = d.retAccrued || 0;
+  const perfBonus    = d.perfBonus || 0;
+  const leaveAmt     = d.leaveAmt || 0;
+  const salAdvance   = d.salAdvance || 0;
+  const retDeduction = grossRem > 0 ? retMaster * basicSalary / grossRem : 0;
+  const addRetention = d.addRetention || 0;
+  const advancePaid  = d.advancePaid || 0;
+  const perfCash     = d.perfCash || 0;
+
+  const totalEarnings   = basicSalary + otBonus + retAccrued + perfBonus + leaveAmt + salAdvance;
+  const totalDeductions = retDeduction + addRetention + advancePaid + perfCash;
+  const netPay          = totalEarnings - totalDeductions;
+
+  return {
+    basicSalary, otBonus, retentionEarnings: 0, retAccrued, perfBonus, leaveAmt, salAdvance,
+    retDeduction, addRetention, advancePaid, perfCash, totalEarnings, totalDeductions, netPay, retMaster
+  };
+}
+
+async function loadAllForMonth() {
+  const month = getTxt('gen_month');
+  if (!month) { showAlert('gen_alert','Select a month first','error'); return; }
+
+  // Hide single employee view
+  document.getElementById('gen_details').style.display = 'none';
+  document.getElementById('payslipPreviewCard').style.display = 'none';
+  document.getElementById('gen_employee').value = '';
+
+  // Show batch card
+  const card = document.getElementById('batchSummaryCard');
+  card.style.display = 'block';
+  document.getElementById('batchLoading').style.display = 'block';
+  document.getElementById('batchTable').innerHTML = '';
+  document.getElementById('batchBtnRow').style.display = 'none';
+
+  // Get employees for this month
+  const empData = await callScript('getEmployeesForMonth', { mmyy: month });
+  if (!empData?.employees || !empData.employees.length) {
+    document.getElementById('batchLoading').style.display = 'none';
+    document.getElementById('batchTable').innerHTML = '<p style="color:#666;padding:12px">No employees found for this month.</p>';
+    return;
+  }
+
+  // Fetch data and compute for each employee
+  batchResults = [];
+  for (const emp of empData.employees) {
+    const d = await callScript('getEmployeeData', { employee: emp, mmyy: month });
+    if (d?.success) {
+      const c = computePayslipFromData(d);
+      batchResults.push({ employee: emp, month, data: d, computed: c });
+    }
+  }
+
+  document.getElementById('batchLoading').style.display = 'none';
+
+  if (!batchResults.length) {
+    document.getElementById('batchTable').innerHTML = '<p style="color:#666;padding:12px">Could not load employee data.</p>';
+    return;
+  }
+
+  // Build summary table
+  let grandNet = 0, grandEarn = 0, grandDed = 0;
+  let html = `<table class="data-table"><thead><tr>
+    <th>Employee</th><th style="text-align:right">Basic Salary</th><th style="text-align:right">OT Bonus</th>
+    <th style="text-align:right">Ret. Accrued</th><th style="text-align:right">Perf Bonus</th>
+    <th style="text-align:right">Total Earnings</th><th style="text-align:right">Total Deductions</th>
+    <th style="text-align:right;font-weight:700">Net Pay</th>
+  </tr></thead><tbody>`;
+
+  batchResults.forEach(r => {
+    const c = r.computed;
+    grandNet  += c.netPay;
+    grandEarn += c.totalEarnings;
+    grandDed  += c.totalDeductions;
+    html += `<tr>
+      <td>${r.employee}</td>
+      <td style="text-align:right">${fmt(c.basicSalary)}</td>
+      <td style="text-align:right">${fmt(c.otBonus)}</td>
+      <td style="text-align:right">${fmt(c.retAccrued)}</td>
+      <td style="text-align:right">${fmt(c.perfBonus)}</td>
+      <td style="text-align:right">${fmt(c.totalEarnings)}</td>
+      <td style="text-align:right">${fmt(c.totalDeductions)}</td>
+      <td style="text-align:right;font-weight:700">${fmt(c.netPay)}</td>
+    </tr>`;
+  });
+
+  html += `</tbody><tfoot>
+    <tr style="font-weight:bold;background:#e8eaf6">
+      <td>TOTAL (${batchResults.length} employees)</td>
+      <td colspan="4"></td>
+      <td style="text-align:right">${fmt(grandEarn)}</td>
+      <td style="text-align:right">${fmt(grandDed)}</td>
+      <td style="text-align:right;font-size:15px;color:#1a237e">₹ ${fmt(grandNet)}</td>
+    </tr>
+  </tfoot></table>`;
+
+  document.getElementById('batchTable').innerHTML = html;
+  document.getElementById('batchBtnRow').style.display = 'flex';
+}
+
+async function saveAllPayslips() {
+  if (!batchResults.length) { showAlert('batch_alert','No data to save','error'); return; }
+  let saved = 0, failed = 0;
+  showAlert('batch_alert', '⏳ Saving payslips... please wait', 'info');
+
+  for (const r of batchResults) {
+    const c = r.computed;
+    const res = await callScript('savePayslip', {
+      employee: r.employee, mmyy: r.month,
+      basicSalary: c.basicSalary.toFixed(2), otBonus: c.otBonus.toFixed(2),
+      retentionEarnings: c.retentionEarnings.toFixed(2), perfBonus: c.perfBonus.toFixed(2),
+      leaveAmt: c.leaveAmt.toFixed(2), salAdvance: c.salAdvance.toFixed(2),
+      retDeduction: c.retDeduction.toFixed(2), addRetention: c.addRetention.toFixed(2),
+      advancePaid: c.advancePaid.toFixed(2), perfCash: c.perfCash.toFixed(2),
+      netPay: c.netPay.toFixed(2), retAccrued: c.retAccrued.toFixed(2)
+    });
+    if (res?.success) saved++; else failed++;
+  }
+
+  if (failed === 0) showAlert('batch_alert', `✅ All ${saved} payslips saved to Google Sheet!`, 'success');
+  else showAlert('batch_alert', `⚠️ ${saved} saved, ${failed} failed.`, 'error');
+}
+
+function closeBatchSummary() {
+  document.getElementById('batchSummaryCard').style.display = 'none';
+  batchResults = [];
 }
 
 // ============================================================
