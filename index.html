@@ -200,6 +200,7 @@
 
       <div class="divider">Monthly Adjustments (Editable)</div>
       <div class="form-grid">
+        <div class="form-group"><label>Retention Bonus Accrued (Earnings)</label><input type="number" id="gen_retaccrued" value="0" /></div>
         <div class="form-group"><label>Performance Bonus (Earnings)</label><input type="number" id="gen_perfbonus" value="0" /></div>
         <div class="form-group"><label>Leave Encashment Amount</label><input type="number" id="gen_leaveamt" value="0" /></div>
         <div class="form-group"><label>Salary Advance</label><input type="number" id="gen_saladvance" value="0" /></div>
@@ -257,6 +258,7 @@
     </div>
     <div class="divider">Earnings Adjustments</div>
     <div class="form-grid">
+      <div class="form-group"><label>Retention Bonus Accrued</label><input type="number" id="md_retaccrued" value="0" /></div>
       <div class="form-group"><label>Performance Bonus</label><input type="number" id="md_perfbonus" value="0" /></div>
       <div class="form-group"><label>Leave Encashment Amt</label><input type="number" id="md_leaveamt" value="0" /></div>
       <div class="form-group"><label>Salary Advance</label><input type="number" id="md_saladvance" value="0" /></div>
@@ -444,6 +446,7 @@
     </div>
     <div class="divider">Earnings</div>
     <div class="form-grid">
+      <div class="form-group"><label>Ret. Bonus Accrued</label><input type="number" id="modal_md_retaccrued" /></div>
       <div class="form-group"><label>Perf Bonus</label><input type="number" id="modal_md_perfbonus" /></div>
       <div class="form-group"><label>Leave Encashment Amt</label><input type="number" id="modal_md_leaveamt" /></div>
       <div class="form-group"><label>Salary Advance</label><input type="number" id="modal_md_saladvance" /></div>
@@ -596,6 +599,7 @@ async function loadEmployeeDetails() {
   setVal('gen_remuneration',   data.remuneration);
   // Pre-fill retention from master (readonly)
   setVal('gen_retentionmaster', data.retentionBonus||0);
+  setVal('gen_retaccrued', data.retAccrued||0);
   setVal('gen_perfbonus',   data.perfBonus||0);
   setVal('gen_leaveamt',    data.leaveAmt||0);
   setVal('gen_saladvance',  data.salAdvance||0);
@@ -631,8 +635,9 @@ function computePayslip() {
       + night * (grossRem / avail) * 0.2
     : 0;
 
-  // No retention on earnings side
+  // No retention on earnings side (auto-computed) — but Retention Bonus Accrued is manual earning
   const retentionEarnings = 0;
+  const retAccrued = getNum('gen_retaccrued');
 
   const perfBonus  = getNum('gen_perfbonus');
   const leaveAmt   = getNum('gen_leaveamt');
@@ -644,12 +649,12 @@ function computePayslip() {
   const advancePaid   = getNum('gen_advancepaid');
   const perfCash      = getNum('gen_perfcash');
 
-  const totalEarnings   = basicSalary + otBonus + perfBonus + leaveAmt + salAdvance;
+  const totalEarnings   = basicSalary + otBonus + retAccrued + perfBonus + leaveAmt + salAdvance;
   const totalDeductions = retDeduction + addRetention + advancePaid + perfCash;
   const netPay          = totalEarnings - totalDeductions;
 
   return {
-    basicSalary, otBonus, retentionEarnings, perfBonus, leaveAmt, salAdvance,
+    basicSalary, otBonus, retentionEarnings, retAccrued, perfBonus, leaveAmt, salAdvance,
     retDeduction, addRetention, advancePaid, perfCash, totalEarnings, totalDeductions, netPay,
     retMaster  // pass through for display on payslip info grid
   };
@@ -687,8 +692,9 @@ function computeAndPreview() {
     <tbody>
       <tr><td>Basic Salary</td>                     <td style="text-align:right">${fmt(c.basicSalary)}</td>        <td>Retention Bonus</td>           <td style="text-align:right">${fmt(c.retDeduction)}</td></tr>
       <tr><td>Overtime and Night Bonus</td>         <td style="text-align:right">${fmt(c.otBonus)}</td>            <td>Additional Retention</td>      <td style="text-align:right">${fmt(c.addRetention)}</td></tr>
-      <tr><td>Performance Bonus*</td>               <td style="text-align:right">${fmt(c.perfBonus)}</td>          <td>Advance Already Paid</td>      <td style="text-align:right">${fmt(c.advancePaid)}</td></tr>
-      <tr><td>Leave Encashment**</td>               <td style="text-align:right">${fmt(c.leaveAmt)}</td>           <td>Performance Bonus Paid (Cash)</td><td style="text-align:right">${fmt(c.perfCash)}</td></tr>
+      <tr><td>Retention Bonus Accrued*</td>         <td style="text-align:right">${fmt(c.retAccrued)}</td>         <td>Advance Already Paid</td>      <td style="text-align:right">${fmt(c.advancePaid)}</td></tr>
+      <tr><td>Performance Bonus*</td>               <td style="text-align:right">${fmt(c.perfBonus)}</td>          <td>Performance Bonus Paid (Cash)</td><td style="text-align:right">${fmt(c.perfCash)}</td></tr>
+      <tr><td>Leave Encashment**</td>               <td style="text-align:right">${fmt(c.leaveAmt)}</td>           <td></td><td></td></tr>
       <tr><td>Salary Advance</td>                   <td style="text-align:right">${fmt(c.salAdvance)}</td>         <td></td><td></td></tr>
     </tbody>
     <tfoot>
@@ -767,7 +773,7 @@ async function saveMonthlyData() {
     leaveHours:getTxt('md_leavehours'), perfBonus:getTxt('md_perfbonus'),
     leaveAmt:getTxt('md_leaveamt'), salAdvance:getTxt('md_saladvance'),
     addRetention:getTxt('md_addretention'), advancePaid:getTxt('md_advancepaid'),
-    perfCash:getTxt('md_perfcash')
+    perfCash:getTxt('md_perfcash'), retAccrued:getTxt('md_retaccrued')
   });
   if (data?.success) showAlert('md_alert','✅ Saved!','success');
   else showAlert('md_alert', data?.message||'Error','error');
@@ -779,9 +785,9 @@ async function loadMonthlyData() {
   if (!month||!emp) { showAlert('md_alert','Select month and employee','error'); return; }
   const data = await callScript('getMonthlyEntry', {employee:emp, mmyy:month});
   if (!data?.success) { showAlert('md_alert', data?.message||'No data found','error'); return; }
-  ['nighthours','actualhours','leavehours','perfbonus','leaveamt','saladvance','addretention','advancepaid','perfcash']
+  ['nighthours','actualhours','leavehours','perfbonus','leaveamt','saladvance','addretention','advancepaid','perfcash','retaccrued']
     .forEach((f,i) => {
-      const keys=['nightHours','actualHours','leaveHours','perfBonus','leaveAmt','salAdvance','addRetention','advancePaid','perfCash'];
+      const keys=['nightHours','actualHours','leaveHours','perfBonus','leaveAmt','salAdvance','addRetention','advancePaid','perfCash','retAccrued'];
       setVal('md_'+f, data[keys[i]]);
     });
   showAlert('md_alert','✅ Data loaded!','success');
@@ -794,11 +800,11 @@ async function loadMonthlyTable() {
   if (!data?.rows) { document.getElementById('monthlyTable').innerHTML='No data.'; return; }
   let html=`<table class="data-table"><thead><tr>
     <th>Month</th><th>Employee</th><th>Night Hrs</th><th>Actual Hrs</th><th>Leave Hrs</th>
-    <th>Perf Bonus</th><th>Leave Amt</th><th>Sal Adv</th><th>Add Ret</th><th>Adv Paid</th><th>Perf Cash</th><th>Action</th>
+    <th>Perf Bonus</th><th>Leave Amt</th><th>Sal Adv</th><th>Add Ret</th><th>Adv Paid</th><th>Perf Cash</th><th>Ret Accrued</th><th>Action</th>
   </tr></thead><tbody>`;
   data.rows.forEach(r => {
-    const ri = r[11];
-    html += `<tr>${r.slice(0,11).map(c=>`<td>${c}</td>`).join('')}
+    const ri = r[12]; // rowIndex is now at index 12 (shifted by 1)
+    html += `<tr>${r.slice(0,12).map(c=>`<td>${c}</td>`).join('')}
       <td><button class="btn btn-warning btn-sm" onclick="editMdRow(${JSON.stringify(r)})">✏️ Edit</button></td>
     </tr>`;
   });
@@ -807,7 +813,7 @@ async function loadMonthlyTable() {
 }
 
 function editMdRow(r) {
-  setVal('modal_md_rowindex', r[11]);
+  setVal('modal_md_rowindex', r[12]);
   setVal('modal_md_month',    r[0]);
   setVal('modal_md_employee', r[1]);
   setVal('modal_md_nighthours',   r[2]);
@@ -819,6 +825,7 @@ function editMdRow(r) {
   setVal('modal_md_addretention', r[8]);
   setVal('modal_md_advancepaid',  r[9]);
   setVal('modal_md_perfcash',     r[10]);
+  setVal('modal_md_retaccrued',   r[11]);
   openModal('mdModal');
 }
 
@@ -830,7 +837,7 @@ async function saveMdModal() {
     leaveHours:getTxt('modal_md_leavehours'), perfBonus:getTxt('modal_md_perfbonus'),
     leaveAmt:getTxt('modal_md_leaveamt'), salAdvance:getTxt('modal_md_saladvance'),
     addRetention:getTxt('modal_md_addretention'), advancePaid:getTxt('modal_md_advancepaid'),
-    perfCash:getTxt('modal_md_perfcash')
+    perfCash:getTxt('modal_md_perfcash'), retAccrued:getTxt('modal_md_retaccrued')
   });
   if (data?.success) {
     showAlert('modal_md_alert','✅ Updated!','success');
@@ -840,7 +847,7 @@ async function saveMdModal() {
 
 function clearMonthlyForm() {
   ['md_nighthours','md_actualhours','md_leavehours','md_perfbonus','md_leaveamt',
-   'md_saladvance','md_addretention','md_advancepaid','md_perfcash'].forEach(id=>setVal(id,0));
+   'md_saladvance','md_addretention','md_advancepaid','md_perfcash','md_retaccrued'].forEach(id=>setVal(id,0));
 }
 
 // ============================================================
