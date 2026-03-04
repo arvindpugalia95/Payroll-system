@@ -124,6 +124,7 @@
   <button id="nav-monthly"     onclick="showSection('monthly')">📝 Monthly Data</button>
   <button id="nav-employees"   onclick="showSection('employees')">👥 Employees</button>
   <button id="nav-workingdays" onclick="showSection('workingdays')">📅 Working Days</button>
+  <button id="nav-retention"   onclick="showSection('retention')">📊 Retention Summary</button>
   <button id="nav-setup"       onclick="showSection('setup')">⚙️ Setup</button>
 </div>
 
@@ -381,6 +382,26 @@
   </div>
 </div>
 
+<!-- ======= RETENTION SUMMARY ======= -->
+<div id="section-retention" class="section">
+  <div class="card">
+    <h2>📊 Retention Summary</h2>
+    <div style="display:flex;gap:16px;align-items:flex-end;max-width:500px;margin-bottom:4px">
+      <div class="form-group" style="flex:1">
+        <label>Employee *</label>
+        <select id="ret_employee"><option value="">-- Select Employee --</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="loadRetentionSummary()">🔍 Load Summary</button>
+    </div>
+    <div id="ret_alert"></div>
+  </div>
+
+  <div id="retSummaryCard" class="card" style="display:none">
+    <h2 id="retSummaryTitle">Retention Breakdown</h2>
+    <div id="retSummaryTable" style="overflow-x:auto"></div>
+  </div>
+</div>
+
 </div><!-- /container -->
 
 <!-- ===== PRINT AREA (hidden unless printing) ===== -->
@@ -461,6 +482,26 @@
     <div class="btn-row" style="margin-top:16px">
       <button class="btn btn-success"   onclick="saveMdModal()">💾 Save Changes</button>
       <button class="btn btn-secondary" onclick="closeModal('mdModal')">✕ Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RETENTION EDIT MODAL ===== -->
+<div id="retModal" class="modal-overlay">
+  <div class="modal">
+    <h3>✏️ Edit Retention Entry</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px">
+      <div class="form-group"><label>Month</label><input type="text" id="modal_ret_month" readonly /></div>
+      <div class="form-group"><label>Employee</label><input type="text" id="modal_ret_employee" readonly /></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Retention Deducted</label><input type="number" id="modal_ret_deducted" step="0.01" /></div>
+      <div class="form-group"><label>Retention Accrued (Paid)</label><input type="number" id="modal_ret_accrued" step="0.01" /></div>
+    </div>
+    <div id="modal_ret_alert"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-success"   onclick="saveRetModal()">💾 Save Changes</button>
+      <button class="btn btn-secondary" onclick="closeModal('retModal')">✕ Cancel</button>
     </div>
   </div>
 </div>
@@ -549,6 +590,7 @@ async function loadAllDropdowns() {
   if (!data?.employees) return;
   const opts = data.employees.map(e=>`<option value="${e}">${e}</option>`).join('');
   document.getElementById('md_employee').innerHTML = '<option value="">-- Select --</option>'+opts;
+  document.getElementById('ret_employee').innerHTML = '<option value="">-- Select Employee --</option>'+opts;
 }
 
 // ============================================================
@@ -754,7 +796,7 @@ async function savePayslip() {
     leaveAmt:c.leaveAmt.toFixed(2), salAdvance:c.salAdvance.toFixed(2),
     retDeduction:c.retDeduction.toFixed(2), addRetention:c.addRetention.toFixed(2),
     advancePaid:c.advancePaid.toFixed(2), perfCash:c.perfCash.toFixed(2),
-    netPay:c.netPay.toFixed(2)
+    netPay:c.netPay.toFixed(2), retAccrued:c.retAccrued.toFixed(2)
   });
   if (data?.success) showAlert('gen_alert','✅ Payslip saved to Google Sheet!','success');
   else showAlert('gen_alert', data?.message||'Error','error');
@@ -967,6 +1009,94 @@ function clearWdForm() {
   document.getElementById('wd_m').value='';
   document.getElementById('wd_y').value='';
   setVal('wd_days','');
+}
+
+// ============================================================
+// RETENTION SUMMARY
+// ============================================================
+async function loadRetentionDropdown() {
+  const data = await callScript('getEmployees');
+  if (!data?.employees) return;
+  const opts = data.employees.map(e=>`<option value="${e}">${e}</option>`).join('');
+  document.getElementById('ret_employee').innerHTML = '<option value="">-- Select Employee --</option>'+opts;
+}
+
+async function loadRetentionSummary() {
+  const emp = getTxt('ret_employee');
+  if (!emp) { showAlert('ret_alert','Select an employee','error'); return; }
+
+  const data = await callScript('getRetentionLedger', { employee: emp });
+  if (!data?.success) { showAlert('ret_alert', data?.message||'Error','error'); return; }
+
+  const card = document.getElementById('retSummaryCard');
+  if (!data.rows || data.rows.length === 0) {
+    card.style.display = 'block';
+    document.getElementById('retSummaryTitle').textContent = 'Retention Breakdown — ' + emp;
+    document.getElementById('retSummaryTable').innerHTML = '<p style="color:#666;padding:12px">No retention data found for this employee. Generate payslips first.</p>';
+    return;
+  }
+
+  let totalDed = 0, totalAcc = 0;
+  let html = `<table class="data-table"><thead><tr>
+    <th>Month</th><th style="text-align:right">Deducted (Withheld)</th><th style="text-align:right">Accrued (Paid Back)</th><th style="text-align:right">Running Balance</th><th>Action</th>
+  </tr></thead><tbody>`;
+
+  data.rows.forEach(r => {
+    const ded = parseFloat(r[2]) || 0;
+    const acc = parseFloat(r[3]) || 0;
+    totalDed += ded;
+    totalAcc += acc;
+    const runBal = totalDed - totalAcc;
+    html += `<tr>
+      <td>${r[0]}</td>
+      <td style="text-align:right">${fmt(ded)}</td>
+      <td style="text-align:right">${fmt(acc)}</td>
+      <td style="text-align:right;font-weight:600;color:${runBal>0?'#c62828':'#2e7d32'}">${fmt(runBal)}</td>
+      <td><button class="btn btn-warning btn-sm" onclick="editRetEntry('${r[0]}','${r[1]}',${ded},${acc})">✏️ Edit</button></td>
+    </tr>`;
+  });
+
+  const balDue = totalDed - totalAcc;
+  html += `</tbody><tfoot>
+    <tr style="font-weight:bold;background:#e8eaf6">
+      <td>TOTAL</td>
+      <td style="text-align:right">${fmt(totalDed)}</td>
+      <td style="text-align:right">${fmt(totalAcc)}</td>
+      <td style="text-align:right;color:${balDue>0?'#c62828':'#2e7d32'};font-size:15px">${fmt(balDue)}</td>
+      <td></td>
+    </tr>
+    <tr style="background:#e8f5e9">
+      <td colspan="3" style="text-align:right;font-weight:bold;font-size:14px;padding:12px">Balance Due to Employee →</td>
+      <td style="text-align:right;font-weight:bold;font-size:16px;color:${balDue>0?'#c62828':'#2e7d32'};padding:12px">₹ ${fmt(balDue)}</td>
+      <td></td>
+    </tr>
+  </tfoot></table>`;
+
+  document.getElementById('retSummaryTitle').textContent = 'Retention Breakdown — ' + emp;
+  document.getElementById('retSummaryTable').innerHTML = html;
+  card.style.display = 'block';
+}
+
+function editRetEntry(mmyy, emp, ded, acc) {
+  setVal('modal_ret_month', mmyy);
+  setVal('modal_ret_employee', emp);
+  setVal('modal_ret_deducted', ded);
+  setVal('modal_ret_accrued', acc);
+  openModal('retModal');
+}
+
+async function saveRetModal() {
+  const mmyy = getTxt('modal_ret_month');
+  const emp  = getTxt('modal_ret_employee');
+  const data = await callScript('updateRetentionEntry', {
+    mmyy, employee: emp,
+    retDeducted: getTxt('modal_ret_deducted'),
+    retAccrued:  getTxt('modal_ret_accrued')
+  });
+  if (data?.success) {
+    showAlert('modal_ret_alert','✅ Updated!','success');
+    setTimeout(()=>{ closeModal('retModal'); loadRetentionSummary(); }, 1200);
+  } else showAlert('modal_ret_alert', data?.message||'Error','error');
 }
 
 init();
